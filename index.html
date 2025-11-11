@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Minecraft風ワールド with OrbitControls</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls.js を個別に読み込む -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // シーン、カメラ、レンダラーの初期化
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // OrbitControls の設定
+        const controls = new THREE.OrbitControls(camera, renderer.domElement); // カメラの操作を追加
+        controls.enableDamping = true; // 画面を滑らかに動かす
+        controls.dampingFactor = 0.25; // ダンピング（滑らかさ）の調整
+        controls.screenSpacePanning = false; // パン操作（地面の移動）を無効に
+        controls.maxPolarAngle = Math.PI / 2; // 上下の回転制限
+
+        // 地面を作成
+        const groundGeometry = new THREE.PlaneGeometry(100, 100);
+        const groundMaterial = new THREE.MeshBasicMaterial({ color: 0x228B22, side: THREE.DoubleSide });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = Math.PI / 2;
+        scene.add(ground);
+
+        // プレイヤー（カメラ）設定
+        camera.position.y = 2;
+        camera.position.z = 5;
+        const playerSpeed = 0.1;
+        const jumpHeight = 2; // ジャンプの高さ
+        let isJumping = false;
+        let jumpVelocity = 0;
+        let gravity = -0.05; // 重力
+
+        // キー入力の状態を保存するオブジェクト
+        const keys = {
+            w: false,
+            s: false,
+            a: false,
+            d: false,
+            space: false
+        };
+
+        // プレイヤーの移動
+        function movePlayer() {
+            if (keys.w) {
+                camera.position.z -= playerSpeed;
+            }
+            if (keys.s) {
+                camera.position.z += playerSpeed;
+            }
+            if (keys.a) {
+                camera.position.x -= playerSpeed;
+            }
+            if (keys.d) {
+                camera.position.x += playerSpeed;
+            }
+
+            // ジャンプ処理
+            if (keys.space && !isJumping) {
+                isJumping = true;
+                jumpVelocity = jumpHeight; // ジャンプの速度設定
+            }
+
+            if (isJumping) {
+                camera.position.y += jumpVelocity;
+                jumpVelocity += gravity;
+
+                // 地面に戻る処理
+                if (camera.position.y <= 2) {
+                    camera.position.y = 2;
+                    isJumping = false;
+                }
+            }
+        }
+
+        // クリックでブロックを置く
+        const blockGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const blockMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true }); // 境界線を追加
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function placeBlock(event) {
+            // マウスの位置を正規化
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            // レイキャストを行う
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObject(ground);
+
+            if (intersects.length > 0) {
+                const intersection = intersects[0];
+                const newBlock = new THREE.Mesh(blockGeometry, blockMaterial);
+                newBlock.position.copy(intersection.point);
+                newBlock.position.y += 0.5; // 地面に重ならないように少し上に配置
+                scene.add(newBlock);
+            }
+        }
+
+        // マウスクリックイベントリスナー
+        window.addEventListener('click', placeBlock, false);
+
+        // キーイベントリスナー
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'w') keys.w = true;
+            if (event.key === 's') keys.s = true;
+            if (event.key === 'a') keys.a = true;
+            if (event.key === 'd') keys.d = true;
+            if (event.key === ' ') keys.space = true;
+        });
+
+        window.addEventListener('keyup', (event) => {
+            if (event.key === 'w') keys.w = false;
+            if (event.key === 's') keys.s = false;
+            if (event.key === 'a') keys.a = false;
+            if (event.key === 'd') keys.d = false;
+            if (event.key === ' ') keys.space = false;
+        });
+
+        // レンダリングループ
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            movePlayer();
+            controls.update(); // OrbitControlsを更新
+
+            renderer.render(scene, camera);
+        }
+
+        // ウィンドウサイズ変更時の対応
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+
+        animate();
+    </script>
+</body>
+</html>
